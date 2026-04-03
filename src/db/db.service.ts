@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { User, Article, Category, Comment } from '../types';
+import { Article } from 'src/article/types';
+import { Category } from 'src/category/types';
+import { Comment } from 'src/comment/types';
+import { User } from 'src/user/types';
 
 @Injectable()
 export class DbService {

@@ -2,6 +2,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Injectable,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
@@ -10,6 +11,7 @@ import { DbService } from '../db/db.service';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
 import { User, UserRole } from './types';
 
+@Injectable()
 export class UserService {
   constructor(private readonly db: DbService) {}
 
