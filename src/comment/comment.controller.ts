@@ -20,6 +20,11 @@ export class CommentController {
     return this.commentService.findAllByArticle(articleId);
   }
 
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.commentService.getById(id);
+  }
+
   @Post()
   create(@Body() createCommentDto: CreateCommentDto) {
     return this.commentService.create(createCommentDto);

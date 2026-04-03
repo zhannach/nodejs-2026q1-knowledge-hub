@@ -21,6 +21,17 @@ export class CommentService {
     return this.db.comments.filter((c) => c.articleId === articleId);
   }
 
+  getById(id: string) {
+    if (!isUuid(id)) {
+      throw new BadRequestException('Invalid UUID');
+    }
+    const comment = this.db.comments.find((c) => c.id === id);
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+    return comment;
+  }
+
   create(createCommentDto: CreateCommentDto) {
     if (!createCommentDto.content || !createCommentDto.articleId) {
       throw new BadRequestException('Missing content or articleId');
