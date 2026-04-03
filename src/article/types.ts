@@ -4,7 +4,7 @@ export enum ArticleStatus {
   ARCHIVED = 'archived',
 }
 
-export class Article {
+export interface Article {
   id: string;
   title: string;
   content: string;
