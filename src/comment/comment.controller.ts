@@ -10,14 +10,15 @@ import {
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { PaginationQuery } from '../utils';
 
 @Controller('comment')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Get()
-  findAll(@Query('articleId') articleId: string) {
-    return this.commentService.findAllByArticle(articleId);
+  findAll(@Query() query: PaginationQuery) {
+    return this.commentService.findAllByArticle(query);
   }
 
   @Get(':id')

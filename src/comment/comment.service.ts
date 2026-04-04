@@ -9,16 +9,20 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 import { DbService } from '../db/db.service';
 import { Comment } from './types';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
+import { applyPaginationAndSorting, PaginationQuery } from '../utils';
 
 @Injectable()
 export class CommentService {
   constructor(private readonly db: DbService) {}
 
-  findAllByArticle(articleId: string) {
-    if (!articleId) {
+  findAllByArticle(query: PaginationQuery) {
+    if (!query.articleId) {
       throw new BadRequestException('articleId query parameter is required');
     }
-    return this.db.comments.filter((c) => c.articleId === articleId);
+    const result = this.db.comments.filter(
+      (c) => c.articleId === query.articleId,
+    );
+    return applyPaginationAndSorting(result, query);
   }
 
   getById(id: string) {

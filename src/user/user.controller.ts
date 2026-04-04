@@ -7,25 +7,31 @@ import {
   Param,
   Delete,
   HttpCode,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { User } from './types';
+import { PaginationQuery } from '../utils';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   private excludePassword(user: User) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...result } = user;
+    const result = { ...user };
+    delete result.password;
     return result;
   }
 
   @Get()
-  getAll() {
-    return this.userService.getAll().map((u) => this.excludePassword(u));
+  getAll(@Query() query: PaginationQuery) {
+    const res = this.userService.getAll(query);
+    if (!Array.isArray(res)) {
+      return { ...res, data: res.data.map((u) => this.excludePassword(u)) };
+    }
+    return res.map((u) => this.excludePassword(u));
   }
 
   @Get(':id')

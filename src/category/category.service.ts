@@ -9,13 +9,14 @@ import { DbService } from '../db/db.service';
 
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
 import { Category } from './types';
+import { applyPaginationAndSorting, PaginationQuery } from '../utils';
 
 @Injectable()
 export class CategoryService {
   constructor(private readonly db: DbService) {}
 
-  getAll() {
-    return this.db.categories;
+  getAll(query: PaginationQuery = {}) {
+    return applyPaginationAndSorting(this.db.categories, query);
   }
 
   getById(id: string) {

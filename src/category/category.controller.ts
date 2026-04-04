@@ -7,18 +7,20 @@ import {
   Param,
   Delete,
   HttpCode,
+  Query,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { PaginationQuery } from '../utils';
 
 @Controller('category')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Get()
-  findAll() {
-    return this.categoryService.getAll();
+  findAll(@Query() query: PaginationQuery) {
+    return this.categoryService.getAll(query);
   }
 
   @Get(':id')

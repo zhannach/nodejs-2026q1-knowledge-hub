@@ -9,12 +9,13 @@ import { DbService } from '../db/db.service';
 
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
 import { Article, ArticleStatus } from './types';
+import { applyPaginationAndSorting, PaginationQuery } from '../utils';
 
 @Injectable()
 export class ArticleService {
   constructor(private readonly db: DbService) {}
 
-  getAll(query: any) {
+  getAll(query: PaginationQuery) {
     let result = this.db.articles;
 
     if (query.status) {
@@ -26,7 +27,7 @@ export class ArticleService {
     if (query.tag) {
       result = result.filter((a) => a.tags.includes(query.tag));
     }
-    return result;
+    return applyPaginationAndSorting(result, query);
   }
 
   getById(id: string) {
