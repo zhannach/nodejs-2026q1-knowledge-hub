@@ -8,7 +8,7 @@
 ## Downloading
 
 ```
-git clone {repository URL}
+git clone https://github.com/zhannach/nodejs-2026q1-knowledge-hub.git
 ```
 
 ## Installing NPM modules
