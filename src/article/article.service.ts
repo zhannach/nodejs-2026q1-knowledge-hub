@@ -80,8 +80,7 @@ export class ArticleService {
       data: {
         title: createArticleDto.title,
         content: createArticleDto.content,
-        status:
-          (createArticleDto.status as ArticleStatus) || ArticleStatus.DRAFT,
+        status: createArticleDto.status ?? ArticleStatus.DRAFT,
         authorId: createArticleDto.authorId || null,
         categoryId: createArticleDto.categoryId || null,
 

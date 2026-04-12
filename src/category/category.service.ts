@@ -8,76 +8,69 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { DbService } from '../db/db.service';
 
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
-import { Category } from './types';
 import { applyPaginationAndSorting, PaginationQuery } from '../utils';
+import { Category } from '@prisma/client';
 
 @Injectable()
 export class CategoryService {
   constructor(private readonly db: DbService) {}
 
-  getAll(query: PaginationQuery = {}) {
-    return applyPaginationAndSorting(this.db.categories, query);
+  async getAll(query: PaginationQuery = {}) {
+    const categories = await this.db.category.findMany();
+    return applyPaginationAndSorting(categories as Category[], query);
   }
 
-  getById(id: string) {
+  async getById(id: string) {
     if (!isUuid(id)) {
       throw new BadRequestException('Invalid UUID');
     }
-    const category = this.db.categories.find((c) => c.id === id);
+    const category = await this.db.category.findUnique({ where: { id } });
     if (!category) {
       throw new NotFoundException('Category not found');
     }
-    return category;
+    return category as unknown as Category;
   }
 
-  create(createCategoryDto: CreateCategoryDto) {
+  async create(createCategoryDto: CreateCategoryDto) {
     if (!createCategoryDto.name || !createCategoryDto.description) {
       throw new BadRequestException('Missing name or description');
     }
-    const newCategory: Category = {
-      id: uuidv4(),
-      name: createCategoryDto.name,
-      description: createCategoryDto.description,
-    };
-    this.db.categories.push(newCategory);
-    return newCategory;
+    const newCategory = await this.db.category.create({
+      data: {
+        id: uuidv4(),
+        name: createCategoryDto.name,
+        description: createCategoryDto.description,
+      },
+    });
+    return newCategory as unknown as Category;
   }
 
-  update(id: string, updateCategoryDto: UpdateCategoryDto) {
+  async update(id: string, updateCategoryDto: UpdateCategoryDto) {
     if (!isUuid(id)) {
       throw new BadRequestException('Invalid UUID');
     }
-    const category = this.db.categories.find((c) => c.id === id);
+    const category = await this.db.category.findUnique({ where: { id } });
     if (!category) {
       throw new NotFoundException('Category not found');
     }
 
-    if (updateCategoryDto.name) {
-      category.name = updateCategoryDto.name;
-    }
-    if (updateCategoryDto.description) {
-      category.description = updateCategoryDto.description;
-    }
+    const updated = await this.db.category.update({
+      where: { id },
+      data: updateCategoryDto,
+    });
 
-    return category;
+    return updated as unknown as Category;
   }
 
-  remove(id: string) {
+  async remove(id: string) {
     if (!isUuid(id)) {
       throw new BadRequestException('Invalid UUID');
     }
-    const index = this.db.categories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const category = await this.db.category.findUnique({ where: { id } });
+    if (!category) {
       throw new NotFoundException('Category not found');
     }
 
-    this.db.categories.splice(index, 1);
-
-    // Cascading delete
-    this.db.articles.forEach((a) => {
-      if (a.categoryId === id) {
-        a.categoryId = null;
-      }
-    });
+    await this.db.category.delete({ where: { id } });
   }
 }
