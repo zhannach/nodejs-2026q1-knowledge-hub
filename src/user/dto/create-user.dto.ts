@@ -1,3 +1,4 @@
+import { Role } from '@prisma/client';
 import {
   IsString,
   IsNotEmpty,
@@ -5,7 +6,6 @@ import {
   IsOptional,
   MinLength,
 } from 'class-validator';
-import { UserRole } from '../types';
 
 export class CreateUserDto {
   @IsString()
@@ -17,7 +17,7 @@ export class CreateUserDto {
   @MinLength(1)
   password: string;
 
-  @IsEnum(UserRole)
+  @IsEnum(Role)
   @IsOptional()
-  role?: UserRole = UserRole.VIEWER;
+  role?: Role = Role.VIEWER;
 }

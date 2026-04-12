@@ -12,8 +12,8 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
-import { User } from './types';
 import { PaginationQuery } from '../utils';
+import { User } from '@prisma/client';
 
 @Controller('user')
 export class UserController {
@@ -26,37 +26,40 @@ export class UserController {
   }
 
   @Get()
-  getAll(@Query() query: PaginationQuery) {
-    const res = this.userService.getAll(query);
-    if (!Array.isArray(res)) {
-      return { ...res, data: res.data.map((u) => this.excludePassword(u)) };
-    }
-    return res.map((u) => this.excludePassword(u));
+  async getAll(@Query() query: PaginationQuery) {
+    const res = await this.userService.getAll(query);
+
+    const data = Array.isArray(res) ? res : res.data;
+    return data.map((u) => this.excludePassword(u));
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.excludePassword(this.userService.getById(id));
+  async getById(@Param('id') id: string) {
+    const user = await this.userService.getById(id);
+    return this.excludePassword(user);
   }
 
   @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.excludePassword(this.userService.create(createUserDto));
+  async create(@Body() createUserDto: CreateUserDto) {
+    const user = await this.userService.create(createUserDto);
+    return this.excludePassword(user);
   }
 
   @Put(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updatePasswordDto: UpdatePasswordDto,
   ) {
-    return this.excludePassword(
-      this.userService.updatePassword(id, updatePasswordDto),
+    const updated = await this.userService.updatePassword(
+      id,
+      updatePasswordDto,
     );
+    return this.excludePassword(updated);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string) {
-    this.userService.remove(id);
+  async remove(@Param('id') id: string) {
+    await this.userService.remove(id);
   }
 }
