@@ -1,27 +1,22 @@
 import { Role } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import {
-  IsString,
-  IsNotEmpty,
-  IsEnum,
-  IsOptional,
-  MinLength,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export class CreateUserDto {
+export class UpdateUserDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  login: string;
+  oldPassword?: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MinLength(1)
-  password: string;
+  newPassword?: string;
 
+  @IsOptional()
   @Transform(({ value }) =>
     typeof value === 'string' ? value.toUpperCase() : value,
   )
   @IsEnum(Role)
-  @IsOptional()
-  role?: Role = Role.VIEWER;
+  role?: Role;
 }

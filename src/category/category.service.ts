@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -10,6 +11,8 @@ import { DbService } from '../db/db.service';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
 import { applyPaginationAndSorting, PaginationQuery } from '../utils';
 import { Category } from '@prisma/client';
+import { AuthenticatedUser } from '../auth/auth.types';
+import { hasAdminPrivileges } from '../auth/bootstrap-admin';
 
 @Injectable()
 export class CategoryService {
@@ -31,10 +34,13 @@ export class CategoryService {
     return category as unknown as Category;
   }
 
-  async create(createCategoryDto: CreateCategoryDto) {
-    if (!createCategoryDto.name || !createCategoryDto.description) {
-      throw new BadRequestException('Missing name or description');
+  async create(createCategoryDto: CreateCategoryDto, actor: AuthenticatedUser) {
+    const isAdmin = await hasAdminPrivileges(this.db, actor);
+
+    if (!isAdmin) {
+      throw new ForbiddenException('Only admins can manage categories');
     }
+
     const newCategory = await this.db.category.create({
       data: {
         id: uuidv4(),
@@ -45,7 +51,17 @@ export class CategoryService {
     return newCategory as unknown as Category;
   }
 
-  async update(id: string, updateCategoryDto: UpdateCategoryDto) {
+  async update(
+    id: string,
+    updateCategoryDto: UpdateCategoryDto,
+    actor: AuthenticatedUser,
+  ) {
+    const isAdmin = await hasAdminPrivileges(this.db, actor);
+
+    if (!isAdmin) {
+      throw new ForbiddenException('Only admins can manage categories');
+    }
+
     if (!isUuid(id)) {
       throw new BadRequestException('Invalid UUID');
     }
@@ -62,7 +78,13 @@ export class CategoryService {
     return updated as unknown as Category;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor: AuthenticatedUser) {
+    const isAdmin = await hasAdminPrivileges(this.db, actor);
+
+    if (!isAdmin) {
+      throw new ForbiddenException('Only admins can manage categories');
+    }
+
     if (!isUuid(id)) {
       throw new BadRequestException('Invalid UUID');
     }

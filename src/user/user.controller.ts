@@ -8,58 +8,48 @@ import {
   Delete,
   HttpCode,
   Query,
+  Req,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdatePasswordDto } from './dto/update-password.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationQuery } from '../utils';
-import { User } from '@prisma/client';
+import { AuthenticatedRequest } from '../auth/auth.types';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  private excludePassword(user: User) {
-    const result = { ...user };
-    delete result.password;
-    return result;
-  }
-
   @Get()
   async getAll(@Query() query: PaginationQuery) {
-    const res = await this.userService.getAll(query);
-
-    const data = Array.isArray(res) ? res : res.data;
-    return data.map((u) => this.excludePassword(u));
+    return this.userService.getAll(query);
   }
 
   @Get(':id')
   async getById(@Param('id') id: string) {
-    const user = await this.userService.getById(id);
-    return this.excludePassword(user);
+    return this.userService.getById(id);
   }
 
   @Post()
-  async create(@Body() createUserDto: CreateUserDto) {
-    const user = await this.userService.create(createUserDto);
-    return this.excludePassword(user);
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.userService.create(createUserDto, req.user!);
   }
 
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @Body() updatePasswordDto: UpdatePasswordDto,
+    @Body() updateUserDto: UpdateUserDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const updated = await this.userService.updatePassword(
-      id,
-      updatePasswordDto,
-    );
-    return this.excludePassword(updated);
+    return this.userService.update(id, updateUserDto, req.user!);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  async remove(@Param('id') id: string) {
-    await this.userService.remove(id);
+  async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    await this.userService.remove(id, req.user!);
   }
 }

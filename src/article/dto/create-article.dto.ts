@@ -1,4 +1,5 @@
 import { ArticleStatus } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import {
   IsString,
   IsNotEmpty,
@@ -17,6 +18,9 @@ export class CreateArticleDto {
   @IsNotEmpty()
   content: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toUpperCase() : value,
+  )
   @IsEnum(ArticleStatus)
   @IsOptional()
   status?: ArticleStatus = ArticleStatus.DRAFT;

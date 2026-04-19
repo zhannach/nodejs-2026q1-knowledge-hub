@@ -2,12 +2,17 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { DbService } from '../db/db.service';
 import { applyPaginationAndSorting, PaginationQuery } from '../utils';
-import { ArticleStatus } from '@prisma/client';
+import { ArticleStatus, Role } from '@prisma/client';
+import { validate as isUuid } from 'uuid';
+import { AuthenticatedUser } from '../auth/auth.types';
+import { sanitizeUser } from '../user/user.mapper';
+import { hasAdminPrivileges } from '../auth/bootstrap-admin';
 
 @Injectable()
 export class ArticleService {
@@ -18,7 +23,7 @@ export class ArticleService {
 
     const articles = await this.db.article.findMany({
       where: {
-        status: status as ArticleStatus | undefined,
+        status: status ? (status.toUpperCase() as ArticleStatus) : undefined,
         categoryId: categoryId || undefined,
         tags: tag
           ? {
@@ -35,19 +40,16 @@ export class ArticleService {
       },
     });
 
-    const transformed = articles.map((a) => ({
-      ...a,
-      tags: a.tags.map((t) => t.name),
-      createdAt: a.createdAt.getTime(),
-      updatedAt: a.updatedAt.getTime(),
-    }));
+    const transformed = articles.map((article) =>
+      this.serializeArticle(article),
+    );
 
     return applyPaginationAndSorting(transformed as any, query);
   }
 
   async getById(id: string) {
-    if (!id) {
-      throw new BadRequestException('Invalid ID');
+    if (!isUuid(id)) {
+      throw new BadRequestException('Invalid UUID');
     }
 
     const article = await this.db.article.findUnique({
@@ -63,17 +65,30 @@ export class ArticleService {
       throw new NotFoundException('Article not found');
     }
 
-    return {
-      ...article,
-      tags: article.tags.map((t) => t.name),
-      createdAt: article.createdAt.getTime(),
-      updatedAt: article.updatedAt.getTime(),
-    };
+    return this.serializeArticle(article);
   }
 
-  async create(createArticleDto: CreateArticleDto) {
-    if (!createArticleDto.title || !createArticleDto.content) {
-      throw new BadRequestException('Missing title or content');
+  async create(createArticleDto: CreateArticleDto, actor: AuthenticatedUser) {
+    const isAdmin = await hasAdminPrivileges(this.db, actor);
+
+    if (actor.role === Role.VIEWER && !isAdmin) {
+      throw new ForbiddenException('Viewers cannot create articles');
+    }
+
+    const authorId =
+      actor.role === Role.EDITOR && !isAdmin
+        ? actor.id
+        : (createArticleDto.authorId ?? null);
+
+    if (
+      actor.role === Role.EDITOR &&
+      !isAdmin &&
+      createArticleDto.authorId &&
+      createArticleDto.authorId !== actor.id
+    ) {
+      throw new ForbiddenException(
+        'Editors can only create their own articles',
+      );
     }
 
     const article = await this.db.article.create({
@@ -81,7 +96,7 @@ export class ArticleService {
         title: createArticleDto.title,
         content: createArticleDto.content,
         status: createArticleDto.status ?? ArticleStatus.DRAFT,
-        authorId: createArticleDto.authorId || null,
+        authorId,
         categoryId: createArticleDto.categoryId || null,
 
         tags: {
@@ -98,15 +113,24 @@ export class ArticleService {
       },
     });
 
-    return {
-      ...article,
-      tags: article.tags.map((t) => t.name),
-      createdAt: article.createdAt.getTime(),
-      updatedAt: article.updatedAt.getTime(),
-    };
+    return this.serializeArticle(article);
   }
 
-  async update(id: string, updateArticleDto: UpdateArticleDto) {
+  async update(
+    id: string,
+    updateArticleDto: UpdateArticleDto,
+    actor: AuthenticatedUser,
+  ) {
+    const isAdmin = await hasAdminPrivileges(this.db, actor);
+
+    if (actor.role === Role.VIEWER && !isAdmin) {
+      throw new ForbiddenException('Viewers cannot update articles');
+    }
+
+    if (!isUuid(id)) {
+      throw new BadRequestException('Invalid UUID');
+    }
+
     const article = await this.db.article.findUnique({
       where: { id },
     });
@@ -115,12 +139,32 @@ export class ArticleService {
       throw new NotFoundException('Article not found');
     }
 
+    if (
+      actor.role === Role.EDITOR &&
+      !isAdmin &&
+      article.authorId !== actor.id
+    ) {
+      throw new ForbiddenException(
+        'Editors can only update their own articles',
+      );
+    }
+
+    if (
+      actor.role === Role.EDITOR &&
+      !isAdmin &&
+      updateArticleDto.authorId &&
+      updateArticleDto.authorId !== actor.id
+    ) {
+      throw new ForbiddenException('Editors cannot reassign article ownership');
+    }
+
     const updated = await this.db.article.update({
       where: { id },
       data: {
         title: updateArticleDto.title,
         content: updateArticleDto.content,
         status: updateArticleDto.status as ArticleStatus | undefined,
+        authorId: isAdmin ? updateArticleDto.authorId : undefined,
 
         categoryId: updateArticleDto.categoryId,
 
@@ -141,15 +185,20 @@ export class ArticleService {
       },
     });
 
-    return {
-      ...updated,
-      tags: updated.tags.map((t) => t.name),
-      createdAt: updated.createdAt.getTime(),
-      updatedAt: updated.updatedAt.getTime(),
-    };
+    return this.serializeArticle(updated);
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor: AuthenticatedUser) {
+    const isAdmin = await hasAdminPrivileges(this.db, actor);
+
+    if (!isAdmin) {
+      throw new ForbiddenException('Only admins can delete articles');
+    }
+
+    if (!isUuid(id)) {
+      throw new BadRequestException('Invalid UUID');
+    }
+
     const article = await this.db.article.findUnique({
       where: { id },
     });
@@ -163,5 +212,28 @@ export class ArticleService {
     });
 
     return { message: 'Article deleted successfully' };
+  }
+
+  private serializeArticle(article: {
+    id: string;
+    title: string;
+    content: string;
+    status: ArticleStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    authorId: string | null;
+    categoryId: string | null;
+    tags: { name: string }[];
+    author?: any;
+    category?: any;
+  }) {
+    return {
+      ...article,
+      status: article.status.toLowerCase(),
+      tags: article.tags.map((tag) => tag.name),
+      author: article.author ? sanitizeUser(article.author) : article.author,
+      createdAt: article.createdAt.getTime(),
+      updatedAt: article.updatedAt.getTime(),
+    };
   }
 }
