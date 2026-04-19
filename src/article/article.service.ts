@@ -6,87 +6,162 @@ import {
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { DbService } from '../db/db.service';
-
-import { v4 as uuidv4, validate as isUuid } from 'uuid';
-import { Article, ArticleStatus } from './types';
 import { applyPaginationAndSorting, PaginationQuery } from '../utils';
+import { ArticleStatus } from '@prisma/client';
 
 @Injectable()
 export class ArticleService {
   constructor(private readonly db: DbService) {}
 
-  getAll(query: PaginationQuery) {
-    let result = this.db.articles;
+  async getAll(query: PaginationQuery) {
+    const { status, categoryId, tag } = query;
 
-    if (query.status) {
-      result = result.filter((a) => a.status === query.status);
-    }
-    if (query.categoryId) {
-      result = result.filter((a) => a.categoryId === query.categoryId);
-    }
-    if (query.tag) {
-      result = result.filter((a) => a.tags.includes(query.tag));
-    }
-    return applyPaginationAndSorting(result, query);
+    const articles = await this.db.article.findMany({
+      where: {
+        status: status as ArticleStatus | undefined,
+        categoryId: categoryId || undefined,
+        tags: tag
+          ? {
+              some: {
+                name: tag,
+              },
+            }
+          : undefined,
+      },
+      include: {
+        tags: true,
+        category: true,
+        author: true,
+      },
+    });
+
+    const transformed = articles.map((a) => ({
+      ...a,
+      tags: a.tags.map((t) => t.name),
+      createdAt: a.createdAt.getTime(),
+      updatedAt: a.updatedAt.getTime(),
+    }));
+
+    return applyPaginationAndSorting(transformed as any, query);
   }
 
-  getById(id: string) {
-    if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+  async getById(id: string) {
+    if (!id) {
+      throw new BadRequestException('Invalid ID');
     }
-    const article = this.db.articles.find((a) => a.id === id);
+
+    const article = await this.db.article.findUnique({
+      where: { id },
+      include: {
+        tags: true,
+        category: true,
+        author: true,
+      },
+    });
+
     if (!article) {
       throw new NotFoundException('Article not found');
     }
-    return article;
+
+    return {
+      ...article,
+      tags: article.tags.map((t) => t.name),
+      createdAt: article.createdAt.getTime(),
+      updatedAt: article.updatedAt.getTime(),
+    };
   }
 
-  create(createArticleDto: CreateArticleDto) {
+  async create(createArticleDto: CreateArticleDto) {
     if (!createArticleDto.title || !createArticleDto.content) {
       throw new BadRequestException('Missing title or content');
     }
-    const newArticle: Article = {
-      id: uuidv4(),
-      title: createArticleDto.title,
-      content: createArticleDto.content,
-      status: createArticleDto.status || ArticleStatus.DRAFT,
-      authorId: createArticleDto.authorId || null,
-      categoryId: createArticleDto.categoryId || null,
-      tags: createArticleDto.tags || [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+
+    const article = await this.db.article.create({
+      data: {
+        title: createArticleDto.title,
+        content: createArticleDto.content,
+        status: createArticleDto.status ?? ArticleStatus.DRAFT,
+        authorId: createArticleDto.authorId || null,
+        categoryId: createArticleDto.categoryId || null,
+
+        tags: {
+          connectOrCreate: (createArticleDto.tags || []).map((tag) => ({
+            where: { name: tag },
+            create: { name: tag },
+          })),
+        },
+      },
+      include: {
+        tags: true,
+        category: true,
+        author: true,
+      },
+    });
+
+    return {
+      ...article,
+      tags: article.tags.map((t) => t.name),
+      createdAt: article.createdAt.getTime(),
+      updatedAt: article.updatedAt.getTime(),
     };
-    this.db.articles.push(newArticle);
-    return newArticle;
   }
 
-  update(id: string, updateArticleDto: UpdateArticleDto) {
-    if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
-    }
-    const article = this.db.articles.find((a) => a.id === id);
+  async update(id: string, updateArticleDto: UpdateArticleDto) {
+    const article = await this.db.article.findUnique({
+      where: { id },
+    });
+
     if (!article) {
       throw new NotFoundException('Article not found');
     }
 
-    Object.assign(article, updateArticleDto);
+    const updated = await this.db.article.update({
+      where: { id },
+      data: {
+        title: updateArticleDto.title,
+        content: updateArticleDto.content,
+        status: updateArticleDto.status as ArticleStatus | undefined,
 
-    article.updatedAt = Date.now();
-    return article;
+        categoryId: updateArticleDto.categoryId,
+
+        tags: updateArticleDto.tags
+          ? {
+              set: [],
+              connectOrCreate: updateArticleDto.tags.map((tag) => ({
+                where: { name: tag },
+                create: { name: tag },
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        tags: true,
+        category: true,
+        author: true,
+      },
+    });
+
+    return {
+      ...updated,
+      tags: updated.tags.map((t) => t.name),
+      createdAt: updated.createdAt.getTime(),
+      updatedAt: updated.updatedAt.getTime(),
+    };
   }
 
-  remove(id: string) {
-    if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
-    }
-    const index = this.db.articles.findIndex((a) => a.id === id);
-    if (index === -1) {
+  async remove(id: string) {
+    const article = await this.db.article.findUnique({
+      where: { id },
+    });
+
+    if (!article) {
       throw new NotFoundException('Article not found');
     }
 
-    this.db.articles.splice(index, 1);
+    await this.db.article.delete({
+      where: { id },
+    });
 
-    // Cascading delete
-    this.db.comments = this.db.comments.filter((c) => c.articleId !== id);
+    return { message: 'Article deleted successfully' };
   }
 }
