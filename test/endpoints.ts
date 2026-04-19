@@ -33,4 +33,5 @@ export const authRoutes = {
   signup: '/auth/signup',
   login: '/auth/login',
   refresh: '/auth/refresh',
+  logout: '/auth/logout',
 };

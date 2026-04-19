@@ -13,12 +13,16 @@ import { AuthenticatedUser, TokenPayload } from './auth.types';
 import { compare, hash } from 'bcrypt';
 import { sanitizeUser } from '../user/user.mapper';
 import { Role } from '@prisma/client';
+import { RefreshTokenBlacklistService } from './refresh-token-blacklist.service';
+
+type VerifiedRefreshPayload = TokenPayload & { exp: number };
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly db: DbService,
     private readonly jwtService: JwtService,
+    private readonly refreshTokenBlacklist: RefreshTokenBlacklistService,
   ) {}
 
   async signup(dto: AuthCredentialsDto) {
@@ -63,20 +67,9 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshTokenDto) {
-    if (!dto.refreshToken) {
-      throw new UnauthorizedException('Refresh token is required');
-    }
+    const { refreshToken, payload } = await this.verifyRefreshToken(dto);
 
-    let payload: TokenPayload;
-
-    try {
-      payload = await this.jwtService.verifyAsync<TokenPayload>(
-        dto.refreshToken,
-        {
-          secret: process.env.JWT_REFRESH_SECRET,
-        },
-      );
-    } catch {
+    if (this.refreshTokenBlacklist.has(refreshToken)) {
       throw new ForbiddenException('Invalid or expired refresh token');
     }
 
@@ -117,8 +110,20 @@ export class AuthService {
     return {
       id: user.id,
       login: user.login,
-      role: user.role.toLowerCase() as Role,
+      role: user.role,
     };
+  }
+
+  async logout(dto: RefreshTokenDto) {
+    const { refreshToken, payload } = await this.verifyRefreshToken(dto);
+
+    if (this.refreshTokenBlacklist.has(refreshToken)) {
+      throw new ForbiddenException('Invalid or expired refresh token');
+    }
+
+    this.refreshTokenBlacklist.blacklist(refreshToken, payload.exp * 1000);
+
+    return { message: 'Logged out successfully' };
   }
 
   async hashPassword(password: string) {
@@ -144,5 +149,33 @@ export class AuthService {
     ]);
 
     return { accessToken, refreshToken };
+  }
+
+  private async verifyRefreshToken(dto: RefreshTokenDto) {
+    if (!dto.refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    let payload: VerifiedRefreshPayload;
+
+    try {
+      payload = await this.jwtService.verifyAsync<VerifiedRefreshPayload>(
+        dto.refreshToken,
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+        },
+      );
+    } catch {
+      throw new ForbiddenException('Invalid or expired refresh token');
+    }
+
+    if (typeof payload.exp !== 'number') {
+      throw new ForbiddenException('Invalid or expired refresh token');
+    }
+
+    return {
+      refreshToken: dto.refreshToken,
+      payload,
+    };
   }
 }

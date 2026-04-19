@@ -1,4 +1,4 @@
-import { Role, User } from '@prisma/client';
+import { User } from '@prisma/client';
 
 export function sanitizeUser(user: User) {
   const rest: User = { ...user };
@@ -6,7 +6,7 @@ export function sanitizeUser(user: User) {
 
   return {
     ...rest,
-    role: user.role.toLowerCase() as Role,
+    role: user.role.toLowerCase(),
     createdAt: user.createdAt.getTime(),
     updatedAt: user.updatedAt.getTime(),
   };

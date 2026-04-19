@@ -5,6 +5,7 @@ export interface TokenPayload {
   userId: string;
   login: string;
   role: Role;
+  jti?: string;
 }
 
 export interface AuthenticatedUser {

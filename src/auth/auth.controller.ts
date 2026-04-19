@@ -23,4 +23,10 @@ export class AuthController {
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto);
   }
+
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Body() dto: RefreshTokenDto) {
+    return this.authService.logout(dto);
+  }
 }

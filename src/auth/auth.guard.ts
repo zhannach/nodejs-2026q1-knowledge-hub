@@ -38,7 +38,8 @@ export class AuthGuard implements CanActivate {
       path.startsWith('/doc') ||
       path === '/auth/signup' ||
       path === '/auth/login' ||
-      path === '/auth/refresh'
+      path === '/auth/refresh' ||
+      path === '/auth/logout'
     );
   }
 }
