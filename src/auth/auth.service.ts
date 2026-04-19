@@ -8,13 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DbService } from '../db/db.service';
 import { AuthCredentialsDto } from './dto/auth-credentials.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import {
-  getJwtAccessSecret,
-  getJwtAccessTtl,
-  getJwtRefreshSecret,
-  getJwtRefreshTtl,
-  getPasswordSaltRounds,
-} from './auth.config';
+import { getPasswordSaltRounds } from './auth.config';
 import { AuthenticatedUser, TokenPayload } from './auth.types';
 import { compare, hash } from 'bcrypt';
 import { sanitizeUser } from '../user/user.mapper';
@@ -79,7 +73,7 @@ export class AuthService {
       payload = await this.jwtService.verifyAsync<TokenPayload>(
         dto.refreshToken,
         {
-          secret: getJwtRefreshSecret(),
+          secret: process.env.JWT_REFRESH_SECRET,
         },
       );
     } catch {
@@ -106,7 +100,7 @@ export class AuthService {
 
     try {
       payload = await this.jwtService.verifyAsync<TokenPayload>(token, {
-        secret: getJwtAccessSecret(),
+        secret: process.env.JWT_SECRET,
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
@@ -140,12 +134,12 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: getJwtAccessSecret(),
-        expiresIn: getJwtAccessTtl(),
+        secret: process.env.JWT_SECRET,
+        expiresIn: process.env.JWT_ACCESS_TTL,
       }),
       this.jwtService.signAsync(payload, {
-        secret: getJwtRefreshSecret(),
-        expiresIn: getJwtRefreshTtl(),
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: process.env.JWT_REFRESH_TTL,
       }),
     ]);
 
