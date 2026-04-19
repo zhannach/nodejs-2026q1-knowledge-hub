@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { AuthCredentialsDto } from './dto/auth-credentials.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -7,11 +8,13 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @UseGuards(ThrottlerGuard)
   @Post('signup')
   signup(@Body() dto: AuthCredentialsDto) {
     return this.authService.signup(dto);
   }
 
+  @UseGuards(ThrottlerGuard)
   @Post('login')
   @HttpCode(200)
   login(@Body() dto: AuthCredentialsDto) {
