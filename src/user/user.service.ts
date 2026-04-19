@@ -90,6 +90,15 @@ export class UserService {
       throw new BadRequestException('Invalid UUID');
     }
 
+    const hasRoleUpdate = updateUserDto.role !== undefined;
+    const wantsPasswordUpdate =
+      updateUserDto.oldPassword !== undefined ||
+      updateUserDto.newPassword !== undefined;
+
+    if (!hasRoleUpdate && !wantsPasswordUpdate) {
+      throw new BadRequestException('Update payload is empty');
+    }
+
     const user = await this.db.user.findUnique({
       where: { id },
     });
@@ -103,15 +112,6 @@ export class UserService {
 
     if (!isAdmin && !isSelf) {
       throw new ForbiddenException('You can only update your own user');
-    }
-
-    const hasRoleUpdate = updateUserDto.role !== undefined;
-    const wantsPasswordUpdate =
-      updateUserDto.oldPassword !== undefined ||
-      updateUserDto.newPassword !== undefined;
-
-    if (!hasRoleUpdate && !wantsPasswordUpdate) {
-      throw new BadRequestException('Update payload is empty');
     }
 
     if (hasRoleUpdate && !isAdmin) {
@@ -132,11 +132,7 @@ export class UserService {
         throw new BadRequestException('newPassword is required');
       }
 
-      if (!isAdmin) {
-        if (!updateUserDto.oldPassword) {
-          throw new BadRequestException('oldPassword is required');
-        }
-
+      if (updateUserDto.oldPassword) {
         const passwordMatches = await compare(
           updateUserDto.oldPassword,
           user.password,
@@ -145,6 +141,8 @@ export class UserService {
         if (!passwordMatches) {
           throw new ForbiddenException('Wrong old password');
         }
+      } else if (!isAdmin) {
+        throw new BadRequestException('oldPassword is required');
       }
 
       data.password = await this.authService.hashPassword(

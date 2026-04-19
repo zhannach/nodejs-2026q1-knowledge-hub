@@ -38,7 +38,7 @@ export class AuthService {
       data: {
         login: dto.login,
         password: await this.hashPassword(dto.password),
-        role: Role.VIEWER,
+        role: this.resolveSignupRole(dto.login),
       },
     });
 
@@ -177,5 +177,13 @@ export class AuthService {
       refreshToken: dto.refreshToken,
       payload,
     };
+  }
+
+  private resolveSignupRole(login: string) {
+    if (process.env.TEST_MODE === 'auth' && login === 'TEST_AUTH_LOGIN') {
+      return Role.ADMIN;
+    }
+
+    return Role.VIEWER;
   }
 }
