@@ -7,55 +7,61 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { DbService } from '../db/db.service';
-
-import { v4 as uuidv4, validate as isUuid } from 'uuid';
-import { User, UserRole } from './types';
 import { applyPaginationAndSorting, PaginationQuery } from '../utils';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class UserService {
   constructor(private readonly db: DbService) {}
 
-  getAll(query: PaginationQuery = {}) {
-    return applyPaginationAndSorting(this.db.users, query);
+  async getAll(query: PaginationQuery = {}) {
+    const users = await this.db.user.findMany({
+      include: {
+        articles: true,
+        comments: true,
+      },
+    });
+
+    return applyPaginationAndSorting(users, query);
   }
 
-  getById(id: string) {
-    if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
-    }
-
-    const user = this.db.users.find((u) => u.id === id);
+  async getById(id: string) {
+    const user = await this.db.user.findUnique({
+      where: { id },
+      include: {
+        articles: true,
+        comments: true,
+      },
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
     return user;
   }
 
-  create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto) {
     if (!createUserDto.login || !createUserDto.password) {
       throw new BadRequestException('Missing login or password');
     }
 
-    const newUser: User = {
-      id: uuidv4(),
-      login: createUserDto.login,
-      password: createUserDto.password,
-      role: createUserDto.role || UserRole.VIEWER,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    this.db.users.push(newUser);
+    const newUser = await this.db.user.create({
+      data: {
+        login: createUserDto.login,
+        password: createUserDto.password,
+        role: createUserDto.role || Role.VIEWER,
+      },
+    });
+
     return newUser;
   }
 
-  updatePassword(id: string, updatePasswordDto: UpdatePasswordDto) {
-    if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
-    }
+  async updatePassword(id: string, updatePasswordDto: UpdatePasswordDto) {
+    const user = await this.db.user.findUnique({
+      where: { id },
+    });
 
-    const user = this.db.users.find((u) => u.id === id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -64,29 +70,29 @@ export class UserService {
       throw new ForbiddenException('Wrong old password');
     }
 
-    user.password = updatePasswordDto.newPassword;
-    user.updatedAt = Date.now();
-    return user;
+    const updated = await this.db.user.update({
+      where: { id },
+      data: {
+        password: updatePasswordDto.newPassword,
+      },
+    });
+
+    return updated;
   }
 
-  remove(id: string) {
-    if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
-    }
+  async remove(id: string) {
+    const user = await this.db.user.findUnique({
+      where: { id },
+    });
 
-    const index = this.db.users.findIndex((u) => u.id === id);
-    if (index === -1) {
+    if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    this.db.users.splice(index, 1);
-
-    // Cascading delete
-    this.db.articles.forEach((a) => {
-      if (a.authorId === id) {
-        a.authorId = null;
-      }
+    await this.db.user.delete({
+      where: { id },
     });
-    this.db.comments = this.db.comments.filter((c) => c.authorId !== id);
+
+    return { message: 'User deleted successfully' };
   }
 }

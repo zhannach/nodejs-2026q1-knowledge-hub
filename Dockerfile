@@ -9,6 +9,7 @@ RUN npm ci
 
 # Copy source and build
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 # Stage 2: Production
@@ -26,6 +27,8 @@ RUN npm ci --omit=dev
 
 # Copy built output
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/prisma ./prisma
 
 # Create a non-root user and change ownership
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
@@ -35,4 +38,4 @@ USER appuser
 
 EXPOSE $PORT
 
-CMD ["npm", "run", "start:prod"]
+CMD npx prisma migrate deploy && node dist/src/main
