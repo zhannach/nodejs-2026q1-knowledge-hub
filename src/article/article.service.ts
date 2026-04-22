@@ -18,6 +18,15 @@ import { hasAdminPrivileges } from '../auth/bootstrap-admin';
 export class ArticleService {
   constructor(private readonly db: DbService) {}
 
+  private readonly allowedStatusTransitions: Record<
+    ArticleStatus,
+    ArticleStatus[]
+  > = {
+    [ArticleStatus.DRAFT]: [ArticleStatus.PUBLISHED],
+    [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
+    [ArticleStatus.ARCHIVED]: [],
+  };
+
   async getAll(query: PaginationQuery) {
     const { status, categoryId, tag } = query;
 
@@ -158,6 +167,15 @@ export class ArticleService {
       throw new ForbiddenException('Editors cannot reassign article ownership');
     }
 
+    if (
+      updateArticleDto.status &&
+      !this.isValidStatusTransition(article.status, updateArticleDto.status)
+    ) {
+      throw new BadRequestException(
+        `Invalid status transition from ${article.status.toLowerCase()} to ${updateArticleDto.status.toLowerCase()}`,
+      );
+    }
+
     const updated = await this.db.article.update({
       where: { id },
       data: {
@@ -235,5 +253,16 @@ export class ArticleService {
       createdAt: article.createdAt.getTime(),
       updatedAt: article.updatedAt.getTime(),
     };
+  }
+
+  private isValidStatusTransition(
+    currentStatus: ArticleStatus,
+    nextStatus: ArticleStatus,
+  ) {
+    if (currentStatus === nextStatus) {
+      return true;
+    }
+
+    return this.allowedStatusTransitions[currentStatus].includes(nextStatus);
   }
 }
