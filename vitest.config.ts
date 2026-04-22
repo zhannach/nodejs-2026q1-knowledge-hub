@@ -12,6 +12,7 @@ export default defineConfig({
       include: [
         'src/**/*.service.ts',
         'src/**/*.guard.ts',
+        'src/**/*.pipe.ts',
         'src/**/dto/*.ts',
         'src/utils.ts',
         'src/user/user.mapper.ts',
