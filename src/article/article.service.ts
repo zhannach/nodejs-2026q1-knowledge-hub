@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { DbService } from '../db/db.service';
@@ -13,6 +8,11 @@ import { validate as isUuid } from 'uuid';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { sanitizeUser } from '../user/user.mapper';
 import { hasAdminPrivileges } from '../auth/bootstrap-admin';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors';
 
 @Injectable()
 export class ArticleService {
@@ -58,7 +58,7 @@ export class ArticleService {
 
   async getById(id: string) {
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const article = await this.db.article.findUnique({
@@ -71,7 +71,7 @@ export class ArticleService {
     });
 
     if (!article) {
-      throw new NotFoundException('Article not found');
+      throw new NotFoundError('Article not found');
     }
 
     return this.serializeArticle(article);
@@ -81,7 +81,7 @@ export class ArticleService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (actor.role === Role.VIEWER && !isAdmin) {
-      throw new ForbiddenException('Viewers cannot create articles');
+      throw new ForbiddenError('Viewers cannot create articles');
     }
 
     const authorId =
@@ -95,9 +95,7 @@ export class ArticleService {
       createArticleDto.authorId &&
       createArticleDto.authorId !== actor.id
     ) {
-      throw new ForbiddenException(
-        'Editors can only create their own articles',
-      );
+      throw new ForbiddenError('Editors can only create their own articles');
     }
 
     const article = await this.db.article.create({
@@ -133,11 +131,11 @@ export class ArticleService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (actor.role === Role.VIEWER && !isAdmin) {
-      throw new ForbiddenException('Viewers cannot update articles');
+      throw new ForbiddenError('Viewers cannot update articles');
     }
 
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const article = await this.db.article.findUnique({
@@ -145,7 +143,7 @@ export class ArticleService {
     });
 
     if (!article) {
-      throw new NotFoundException('Article not found');
+      throw new NotFoundError('Article not found');
     }
 
     if (
@@ -153,9 +151,7 @@ export class ArticleService {
       !isAdmin &&
       article.authorId !== actor.id
     ) {
-      throw new ForbiddenException(
-        'Editors can only update their own articles',
-      );
+      throw new ForbiddenError('Editors can only update their own articles');
     }
 
     if (
@@ -164,14 +160,14 @@ export class ArticleService {
       updateArticleDto.authorId &&
       updateArticleDto.authorId !== actor.id
     ) {
-      throw new ForbiddenException('Editors cannot reassign article ownership');
+      throw new ForbiddenError('Editors cannot reassign article ownership');
     }
 
     if (
       updateArticleDto.status &&
       !this.isValidStatusTransition(article.status, updateArticleDto.status)
     ) {
-      throw new BadRequestException(
+      throw new ValidationError(
         `Invalid status transition from ${article.status.toLowerCase()} to ${updateArticleDto.status.toLowerCase()}`,
       );
     }
@@ -210,11 +206,11 @@ export class ArticleService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin) {
-      throw new ForbiddenException('Only admins can delete articles');
+      throw new ForbiddenError('Only admins can delete articles');
     }
 
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const article = await this.db.article.findUnique({
@@ -222,7 +218,7 @@ export class ArticleService {
     });
 
     if (!article) {
-      throw new NotFoundException('Article not found');
+      throw new NotFoundError('Article not found');
     }
 
     await this.db.article.delete({

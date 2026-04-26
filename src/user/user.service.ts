@@ -1,9 +1,4 @@
-import {
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { DbService } from '../db/db.service';
@@ -15,6 +10,11 @@ import { AuthService } from '../auth/auth.service';
 import { compare } from 'bcrypt';
 import { sanitizeUser } from './user.mapper';
 import { hasAdminPrivileges } from '../auth/bootstrap-admin';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors';
 
 @Injectable()
 export class UserService {
@@ -37,7 +37,7 @@ export class UserService {
 
   async getById(id: string) {
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const user = await this.db.user.findUnique({
@@ -49,7 +49,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundError('User not found');
     }
 
     return sanitizeUser(user);
@@ -59,7 +59,7 @@ export class UserService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin) {
-      throw new ForbiddenException('Only admins can create users');
+      throw new ForbiddenError('Only admins can create users');
     }
 
     const existingUser = await this.db.user.findUnique({
@@ -67,7 +67,7 @@ export class UserService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Login already taken');
+      throw new ValidationError('Login already taken');
     }
 
     const newUser = await this.db.user.create({
@@ -87,7 +87,7 @@ export class UserService {
     actor: AuthenticatedUser,
   ) {
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const hasRoleUpdate = updateUserDto.role !== undefined;
@@ -96,7 +96,7 @@ export class UserService {
       updateUserDto.newPassword !== undefined;
 
     if (!hasRoleUpdate && !wantsPasswordUpdate) {
-      throw new BadRequestException('Update payload is empty');
+      throw new ValidationError('Update payload is empty');
     }
 
     const user = await this.db.user.findUnique({
@@ -104,18 +104,18 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundError('User not found');
     }
 
     const isAdmin = await hasAdminPrivileges(this.db, actor);
     const isSelf = actor.id === id;
 
     if (!isAdmin && !isSelf) {
-      throw new ForbiddenException('You can only update your own user');
+      throw new ForbiddenError('You can only update your own user');
     }
 
     if (hasRoleUpdate && !isAdmin) {
-      throw new ForbiddenException('Only admins can change user roles');
+      throw new ForbiddenError('Only admins can change user roles');
     }
 
     const data: {
@@ -129,7 +129,7 @@ export class UserService {
 
     if (wantsPasswordUpdate) {
       if (!updateUserDto.newPassword) {
-        throw new BadRequestException('newPassword is required');
+        throw new ValidationError('newPassword is required');
       }
 
       if (updateUserDto.oldPassword) {
@@ -139,10 +139,10 @@ export class UserService {
         );
 
         if (!passwordMatches) {
-          throw new ForbiddenException('Wrong old password');
+          throw new ForbiddenError('Wrong old password');
         }
       } else if (!isAdmin) {
-        throw new BadRequestException('oldPassword is required');
+        throw new ValidationError('oldPassword is required');
       }
 
       data.password = await this.authService.hashPassword(
@@ -160,19 +160,19 @@ export class UserService {
 
   async remove(id: string, actor: AuthenticatedUser) {
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin && actor.id !== id) {
-      throw new ForbiddenException('You can only delete your own user');
+      throw new ForbiddenError('You can only delete your own user');
     }
 
     const user = await this.db.user.findUnique({ where: { id } });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundError('User not found');
     }
 
     await this.db.user.delete({

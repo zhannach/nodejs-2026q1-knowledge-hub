@@ -1,8 +1,3 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
@@ -11,6 +6,11 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { DbService } from '../db/db.service';
 import { AuthService } from './auth.service';
 import { RefreshTokenBlacklistService } from './refresh-token-blacklist.service';
+import {
+  ForbiddenError,
+  UnauthorizedError,
+  ValidationError,
+} from '../common/errors';
 
 vi.mock('bcrypt', () => ({
   compare: vi.fn(),
@@ -82,7 +82,7 @@ describe('AuthService', () => {
 
     await expect(
       service.signup({ login: 'alice', password: 'secret' }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
   });
 
   it('hashes password and assigns viewer role on signup', async () => {
@@ -145,7 +145,7 @@ describe('AuthService', () => {
 
     await expect(
       service.login({ login: 'alice', password: 'secret' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws when login password does not match', async () => {
@@ -159,7 +159,7 @@ describe('AuthService', () => {
 
     await expect(
       service.login({ login: 'alice', password: 'secret' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('generates access and refresh tokens on login', async () => {
@@ -219,7 +219,7 @@ describe('AuthService', () => {
     jwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
 
     await expect(service.validateAccessToken('expired-token')).rejects.toThrow(
-      UnauthorizedException,
+      UnauthorizedError,
     );
   });
 
@@ -232,12 +232,12 @@ describe('AuthService', () => {
     db.user.findUnique.mockResolvedValue(null);
 
     await expect(service.validateAccessToken('valid-token')).rejects.toThrow(
-      UnauthorizedException,
+      UnauthorizedError,
     );
   });
 
   it('throws when refresh token is missing', async () => {
-    await expect(service.refresh({})).rejects.toThrow(UnauthorizedException);
+    await expect(service.refresh({})).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws when refresh token is tampered', async () => {
@@ -245,7 +245,7 @@ describe('AuthService', () => {
 
     await expect(
       service.refresh({ refreshToken: 'tampered-token' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws when refresh token is blacklisted', async () => {
@@ -259,7 +259,7 @@ describe('AuthService', () => {
 
     await expect(
       service.refresh({ refreshToken: 'blacklisted-token' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('rotates tokens for a valid refresh token', async () => {
@@ -295,7 +295,7 @@ describe('AuthService', () => {
 
     await expect(
       service.refresh({ refreshToken: 'refresh-token' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('blacklists refresh token on logout', async () => {

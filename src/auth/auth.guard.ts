@@ -1,11 +1,7 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthenticatedRequest } from './auth.types';
+import { UnauthorizedError } from '../common/errors';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -20,12 +16,12 @@ export class AuthGuard implements CanActivate {
 
     const authorization = request.headers.authorization;
     if (!authorization) {
-      throw new UnauthorizedException('Authorization header is required');
+      throw new UnauthorizedError('Authorization header is required');
     }
 
     const [scheme, token] = authorization.split(' ');
     if (scheme !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Authorization header must use Bearer');
+      throw new UnauthorizedError('Authorization header must use Bearer');
     }
 
     request.user = await this.authService.validateAccessToken(token);

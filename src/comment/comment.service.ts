@@ -1,11 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { DbService } from '../db/db.service';
 import { applyPaginationAndSorting, PaginationQuery } from '../utils';
@@ -14,6 +7,12 @@ import { AuthenticatedUser } from '../auth/auth.types';
 import { sanitizeUser } from '../user/user.mapper';
 import { hasAdminPrivileges } from '../auth/bootstrap-admin';
 import { Role } from '@prisma/client';
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnprocessableEntityError,
+  ValidationError,
+} from '../common/errors';
 
 @Injectable()
 export class CommentService {
@@ -21,11 +20,11 @@ export class CommentService {
 
   async findAllByArticle(query: PaginationQuery) {
     if (!query.articleId) {
-      throw new BadRequestException('articleId query parameter is required');
+      throw new ValidationError('articleId query parameter is required');
     }
 
     if (!isUuid(query.articleId)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const comments = await this.db.comment.findMany({
@@ -44,7 +43,7 @@ export class CommentService {
 
   async getById(id: string) {
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const comment = await this.db.comment.findUnique({
@@ -56,7 +55,7 @@ export class CommentService {
     });
 
     if (!comment) {
-      throw new NotFoundException('Comment not found');
+      throw new NotFoundError('Comment not found');
     }
 
     return this.serializeComment(comment);
@@ -66,7 +65,7 @@ export class CommentService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (actor.role === Role.VIEWER && !isAdmin) {
-      throw new ForbiddenException('Viewers cannot create comments');
+      throw new ForbiddenError('Viewers cannot create comments');
     }
 
     const authorId =
@@ -80,7 +79,7 @@ export class CommentService {
       createCommentDto.authorId &&
       createCommentDto.authorId !== actor.id
     ) {
-      throw new ForbiddenException(
+      throw new ForbiddenError(
         'Editors can only create their own comments',
       );
     }
@@ -90,10 +89,7 @@ export class CommentService {
     });
 
     if (!article) {
-      throw new HttpException(
-        'Article does not exist',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
+      throw new UnprocessableEntityError('Article does not exist');
     }
 
     const newComment = await this.db.comment.create({
@@ -119,17 +115,17 @@ export class CommentService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin) {
-      throw new ForbiddenException('Only admins can delete comments');
+      throw new ForbiddenError('Only admins can delete comments');
     }
 
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
 
     const comment = await this.db.comment.findUnique({ where: { id } });
 
     if (!comment) {
-      throw new NotFoundException('Comment not found');
+      throw new NotFoundError('Comment not found');
     }
 
     await this.db.comment.delete({
