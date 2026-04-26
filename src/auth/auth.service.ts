@@ -14,6 +14,7 @@ import {
   UnauthorizedError,
   ValidationError,
 } from '../common/errors';
+import { StringValue } from 'ms';
 
 type VerifiedRefreshPayload = TokenPayload & { exp: number };
 
@@ -140,11 +141,11 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: process.env.JWT_SECRET,
-        expiresIn: process.env.JWT_ACCESS_TTL,
+        expiresIn: process.env.JWT_ACCESS_TTL as StringValue,
       }),
       this.jwtService.signAsync(payload, {
         secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: process.env.JWT_REFRESH_TTL,
+        expiresIn: process.env.JWT_REFRESH_TTL as StringValue,
       }),
     ]);
 
