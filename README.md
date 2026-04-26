@@ -17,10 +17,10 @@ git clone https://github.com/zhannach/nodejs-2026q1-knowledge-hub.git
 npm install
 ```
 
-## Running application
+## Run application locally with Docker
 
 ```
-npm start
+docker-compose up --build
 ```
 
 After starting the app on port (4000 as default) you can open

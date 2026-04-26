@@ -7,10 +7,12 @@ import {
   Delete,
   Query,
   HttpCode,
+  Req,
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { PaginationQuery } from '../utils';
+import { AuthenticatedRequest } from '../auth/auth.types';
 
 @Controller('comment')
 export class CommentController {
@@ -27,13 +29,16 @@ export class CommentController {
   }
 
   @Post()
-  create(@Body() createCommentDto: CreateCommentDto) {
-    return this.commentService.create(createCommentDto);
+  create(
+    @Body() createCommentDto: CreateCommentDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.commentService.create(createCommentDto, req.user!);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string) {
-    this.commentService.remove(id);
+  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.commentService.remove(id, req.user!);
   }
 }

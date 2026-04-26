@@ -66,8 +66,8 @@ model Comment {
   content   String
   createdAt DateTime @default(now())
 
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   articleId String
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)

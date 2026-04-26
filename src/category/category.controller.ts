@@ -8,11 +8,13 @@ import {
   Delete,
   HttpCode,
   Query,
+  Req,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PaginationQuery } from '../utils';
+import { AuthenticatedRequest } from '../auth/auth.types';
 
 @Controller('category')
 export class CategoryController {
@@ -29,21 +31,25 @@ export class CategoryController {
   }
 
   @Post()
-  create(@Body() createCategoryDto: CreateCategoryDto) {
-    return this.categoryService.create(createCategoryDto);
+  create(
+    @Body() createCategoryDto: CreateCategoryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.categoryService.create(createCategoryDto, req.user!);
   }
 
   @Put(':id')
   update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.categoryService.update(id, updateCategoryDto);
+    return this.categoryService.update(id, updateCategoryDto, req.user!);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string) {
-    this.categoryService.remove(id);
+  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.categoryService.remove(id, req.user!);
   }
 }

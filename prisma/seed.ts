@@ -1,12 +1,16 @@
 import { PrismaClient, Role, ArticleStatus } from '@prisma/client';
+import { hash } from 'bcrypt';
+import { getPasswordSaltRounds } from '../src/auth/auth.config';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const hashedPassword = await hash('password123', getPasswordSaltRounds());
+
   const admin = await prisma.user.create({
     data: {
       login: 'admin_user',
-      password: 'password123',
+      password: hashedPassword,
       role: Role.ADMIN,
     },
   });
@@ -14,7 +18,7 @@ async function main() {
   const editor = await prisma.user.create({
     data: {
       login: 'editor_user',
-      password: 'password123',
+      password: hashedPassword,
       role: Role.EDITOR,
     },
   });
