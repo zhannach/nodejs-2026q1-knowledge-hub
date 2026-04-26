@@ -9,6 +9,8 @@ import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AppLogger } from './common/logging/app-logger.service';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 @Module({
   imports: [
@@ -26,7 +28,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     CommentModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AppLogger, GlobalExceptionFilter],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
