@@ -1,6 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import { ParseUuidPipe } from './parse-uuid.pipe';
+import { ValidationError } from '../errors';
 
 describe('ParseUuidPipe', () => {
   const pipe = new ParseUuidPipe();
@@ -11,7 +11,7 @@ describe('ParseUuidPipe', () => {
     expect(pipe.transform(uuid)).toBe(uuid);
   });
 
-  it('throws BadRequestException for invalid strings', () => {
-    expect(() => pipe.transform('not-a-uuid')).toThrow(BadRequestException);
+  it('throws ValidationError for invalid strings', () => {
+    expect(() => pipe.transform('not-a-uuid')).toThrow(ValidationError);
   });
 });

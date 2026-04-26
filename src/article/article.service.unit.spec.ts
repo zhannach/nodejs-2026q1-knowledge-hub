@@ -1,13 +1,13 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ArticleStatus, Role } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DbService } from '../db/db.service';
 import { ArticleService } from './article.service';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors';
 
 const ARTICLE_ID = '11111111-1111-4111-8111-111111111111';
 const AUTHOR_ID = '22222222-2222-4222-8222-222222222222';
@@ -121,17 +121,13 @@ describe('ArticleService', () => {
   });
 
   it('throws for malformed article UUIDs', async () => {
-    await expect(service.getById('bad-id')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(service.getById('bad-id')).rejects.toThrow(ValidationError);
   });
 
   it('throws when article is not found', async () => {
     db.article.findUnique.mockResolvedValue(null);
 
-    await expect(service.getById(ARTICLE_ID)).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(service.getById(ARTICLE_ID)).rejects.toThrow(NotFoundError);
   });
 
   it('forbids viewers from creating articles', async () => {
@@ -139,7 +135,7 @@ describe('ArticleService', () => {
 
     await expect(
       service.create({ title: 'Title', content: 'Body' }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('prevents editors from creating articles for another author', async () => {
@@ -154,7 +150,7 @@ describe('ArticleService', () => {
         },
         editorActor,
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('creates editor articles with actor ownership and tag management', async () => {
@@ -173,7 +169,7 @@ describe('ArticleService', () => {
       )
       .catch((error) => error);
 
-    expect(result).toBeInstanceOf(ForbiddenException);
+    expect(result).toBeInstanceOf(ForbiddenError);
   });
 
   it('creates articles and normalizes response data', async () => {
@@ -218,13 +214,13 @@ describe('ArticleService', () => {
 
     await expect(
       service.update(ARTICLE_ID, { title: 'Updated' }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws for malformed UUIDs during update', async () => {
     await expect(
       service.update('bad-id', { title: 'Updated' }, adminActor),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
   });
 
   it('throws when updating a missing article', async () => {
@@ -232,7 +228,7 @@ describe('ArticleService', () => {
 
     await expect(
       service.update(ARTICLE_ID, { title: 'Updated' }, adminActor),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(NotFoundError);
   });
 
   it('prevents editors from updating someone else article', async () => {
@@ -243,7 +239,7 @@ describe('ArticleService', () => {
 
     await expect(
       service.update(ARTICLE_ID, { title: 'Updated' }, editorActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('prevents editors from reassigning ownership', async () => {
@@ -252,7 +248,7 @@ describe('ArticleService', () => {
 
     await expect(
       service.update(ARTICLE_ID, { authorId: OTHER_USER_ID }, editorActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('updates articles with tag replacement logic', async () => {
@@ -336,7 +332,7 @@ describe('ArticleService', () => {
         { status: ArticleStatus.ARCHIVED },
         adminActor,
       ),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
 
     expect(db.article.update).not.toHaveBeenCalled();
   });
@@ -348,7 +344,7 @@ describe('ArticleService', () => {
 
     await expect(
       service.update(ARTICLE_ID, { status: ArticleStatus.DRAFT }, adminActor),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
 
     expect(db.article.update).not.toHaveBeenCalled();
   });
@@ -357,7 +353,7 @@ describe('ArticleService', () => {
     db.user.count.mockResolvedValue(1);
 
     await expect(service.remove(ARTICLE_ID, editorActor)).rejects.toThrow(
-      ForbiddenException,
+      ForbiddenError,
     );
   });
 
@@ -365,7 +361,7 @@ describe('ArticleService', () => {
     db.article.findUnique.mockResolvedValue(null);
 
     await expect(service.remove(ARTICLE_ID, adminActor)).rejects.toThrow(
-      NotFoundException,
+      NotFoundError,
     );
   });
 });

@@ -1,14 +1,14 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  HttpException,
-  NotFoundException,
-} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DbService } from '../db/db.service';
 import { CommentService } from './comment.service';
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnprocessableEntityError,
+  ValidationError,
+} from '../common/errors';
 
 const COMMENT_ID = '11111111-1111-4111-8111-111111111111';
 const ARTICLE_ID = '22222222-2222-4222-8222-222222222222';
@@ -61,13 +61,13 @@ describe('CommentService', () => {
   });
 
   it('requires articleId when listing comments', async () => {
-    await expect(service.findAllByArticle({})).rejects.toThrow(BadRequestException);
+    await expect(service.findAllByArticle({})).rejects.toThrow(ValidationError);
   });
 
   it('rejects malformed article UUIDs in query', async () => {
     await expect(
       service.findAllByArticle({ articleId: 'bad-id' }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
   });
 
   it('returns paginated comments for an article', async () => {
@@ -121,21 +121,24 @@ describe('CommentService', () => {
   });
 
   it('throws for malformed comment UUIDs', async () => {
-    await expect(service.getById('bad-id')).rejects.toThrow(BadRequestException);
+    await expect(service.getById('bad-id')).rejects.toThrow(ValidationError);
   });
 
   it('throws when comment is not found', async () => {
     db.comment.findUnique.mockResolvedValue(null);
 
-    await expect(service.getById(COMMENT_ID)).rejects.toThrow(NotFoundException);
+    await expect(service.getById(COMMENT_ID)).rejects.toThrow(NotFoundError);
   });
 
   it('forbids viewers from creating comments', async () => {
     db.user.count.mockResolvedValue(1);
 
     await expect(
-      service.create({ content: 'Nice post', articleId: ARTICLE_ID }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+      service.create(
+        { content: 'Nice post', articleId: ARTICLE_ID },
+        viewerActor,
+      ),
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('prevents editors from creating comments for another author', async () => {
@@ -146,15 +149,18 @@ describe('CommentService', () => {
         { content: 'Nice post', articleId: ARTICLE_ID, authorId: 'other-user' },
         editorActor,
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws when article does not exist', async () => {
     db.article.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.create({ content: 'Nice post', articleId: ARTICLE_ID }, adminActor),
-    ).rejects.toThrow(HttpException);
+      service.create(
+        { content: 'Nice post', articleId: ARTICLE_ID },
+        adminActor,
+      ),
+    ).rejects.toThrow(UnprocessableEntityError);
   });
 
   it('creates comments and connects the author', async () => {
@@ -186,7 +192,7 @@ describe('CommentService', () => {
     db.user.count.mockResolvedValue(1);
 
     await expect(service.remove(COMMENT_ID, editorActor)).rejects.toThrow(
-      ForbiddenException,
+      ForbiddenError,
     );
   });
 
@@ -194,7 +200,7 @@ describe('CommentService', () => {
     db.comment.findUnique.mockResolvedValue(null);
 
     await expect(service.remove(COMMENT_ID, adminActor)).rejects.toThrow(
-      NotFoundException,
+      NotFoundError,
     );
   });
 });

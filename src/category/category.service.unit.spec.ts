@@ -1,13 +1,13 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DbService } from '../db/db.service';
 import { CategoryService } from './category.service';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors';
 
 const CATEGORY_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -67,17 +67,13 @@ describe('CategoryService', () => {
   });
 
   it('throws on malformed UUIDs', async () => {
-    await expect(service.getById('bad-id')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(service.getById('bad-id')).rejects.toThrow(ValidationError);
   });
 
   it('throws when category is missing', async () => {
     db.category.findUnique.mockResolvedValue(null);
 
-    await expect(service.getById(CATEGORY_ID)).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(service.getById(CATEGORY_ID)).rejects.toThrow(NotFoundError);
   });
 
   it('returns a category by id', async () => {
@@ -99,7 +95,7 @@ describe('CategoryService', () => {
 
     await expect(
       service.create({ name: 'Backend', description: 'Topics' }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('creates categories for admins', async () => {
@@ -122,7 +118,7 @@ describe('CategoryService', () => {
   it('throws on malformed UUIDs during update', async () => {
     await expect(
       service.update('bad-id', { name: 'Updated' }, adminActor),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
   });
 
   it('forbids non-admin category updates', async () => {
@@ -130,7 +126,7 @@ describe('CategoryService', () => {
 
     await expect(
       service.update(CATEGORY_ID, { name: 'Updated' }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws when updating a missing category', async () => {
@@ -138,7 +134,7 @@ describe('CategoryService', () => {
 
     await expect(
       service.update(CATEGORY_ID, { name: 'Updated' }, adminActor),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(NotFoundError);
   });
 
   it('updates an existing category', async () => {
@@ -164,7 +160,7 @@ describe('CategoryService', () => {
 
   it('throws on malformed UUIDs during removal', async () => {
     await expect(service.remove('bad-id', adminActor)).rejects.toThrow(
-      BadRequestException,
+      ValidationError,
     );
   });
 
@@ -172,7 +168,7 @@ describe('CategoryService', () => {
     db.user.count.mockResolvedValue(1);
 
     await expect(service.remove(CATEGORY_ID, viewerActor)).rejects.toThrow(
-      ForbiddenException,
+      ForbiddenError,
     );
   });
 
@@ -180,7 +176,7 @@ describe('CategoryService', () => {
     db.category.findUnique.mockResolvedValue(null);
 
     await expect(service.remove(CATEGORY_ID, adminActor)).rejects.toThrow(
-      NotFoundException,
+      NotFoundError,
     );
   });
 

@@ -1,9 +1,9 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { UnauthorizedError } from '../common/errors';
 
 function createExecutionContext(request: Record<string, any>) {
   return {
@@ -63,7 +63,7 @@ describe('AuthGuard', () => {
   it('throws when authorization header is missing', async () => {
     await expect(
       guard.canActivate(createExecutionContext({ path: '/user', headers: {} })),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws when authorization header is malformed', async () => {
@@ -79,7 +79,7 @@ describe('AuthGuard', () => {
 
   it('propagates expired token failures', async () => {
     authService.validateAccessToken.mockRejectedValue(
-      new UnauthorizedException('Invalid or expired access token'),
+      new UnauthorizedError('Invalid or expired access token'),
     );
 
     await expect(
@@ -89,6 +89,6 @@ describe('AuthGuard', () => {
           headers: { authorization: 'Bearer expired-token' },
         }),
       ),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedError);
   });
 });

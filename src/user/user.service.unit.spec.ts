@@ -1,8 +1,3 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -10,6 +5,11 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { DbService } from '../db/db.service';
 import { AuthService } from '../auth/auth.service';
 import { UserService } from './user.service';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors';
 
 vi.mock('bcrypt', () => ({
   compare: vi.fn(),
@@ -113,15 +113,13 @@ describe('UserService', () => {
   });
 
   it('throws for malformed user UUIDs', async () => {
-    await expect(service.getById('bad-id')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(service.getById('bad-id')).rejects.toThrow(ValidationError);
   });
 
   it('throws when user is not found', async () => {
     db.user.findUnique.mockResolvedValue(null);
 
-    await expect(service.getById(USER_ID)).rejects.toThrow(NotFoundException);
+    await expect(service.getById(USER_ID)).rejects.toThrow(NotFoundError);
   });
 
   it('forbids non-admins from creating users', async () => {
@@ -129,7 +127,7 @@ describe('UserService', () => {
 
     await expect(
       service.create({ login: 'alice', password: 'secret' }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws on duplicate user login', async () => {
@@ -137,7 +135,7 @@ describe('UserService', () => {
 
     await expect(
       service.create({ login: 'alice', password: 'secret' }, adminActor),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(ValidationError);
   });
 
   it('hashes passwords and assigns a default role when admins create users', async () => {
@@ -164,7 +162,7 @@ describe('UserService', () => {
 
   it('rejects empty update payloads', async () => {
     await expect(service.update(USER_ID, {}, adminActor)).rejects.toThrow(
-      BadRequestException,
+      ValidationError,
     );
   });
 
@@ -178,7 +176,7 @@ describe('UserService', () => {
 
     await expect(
       service.update(USER_ID, { newPassword: 'secret' }, editorActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('blocks non-admins from changing roles', async () => {
@@ -191,7 +189,7 @@ describe('UserService', () => {
 
     await expect(
       service.update(ACTOR_ID, { role: Role.ADMIN }, viewerActor),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('requires newPassword when password update is attempted', async () => {
@@ -235,7 +233,7 @@ describe('UserService', () => {
         { oldPassword: 'wrong', newPassword: 'new-secret' },
         viewerActor,
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('hashes new password for valid self-service updates', async () => {
@@ -294,7 +292,7 @@ describe('UserService', () => {
     db.user.count.mockResolvedValue(1);
 
     await expect(service.remove(USER_ID, viewerActor)).rejects.toThrow(
-      ForbiddenException,
+      ForbiddenError,
     );
   });
 
@@ -302,7 +300,7 @@ describe('UserService', () => {
     db.user.findUnique.mockResolvedValue(null);
 
     await expect(service.remove(USER_ID, adminActor)).rejects.toThrow(
-      NotFoundException,
+      NotFoundError,
     );
   });
 });

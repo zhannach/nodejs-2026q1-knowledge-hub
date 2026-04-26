@@ -1,9 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DbService } from '../db/db.service';
 import { AuthCredentialsDto } from './dto/auth-credentials.dto';
@@ -14,6 +9,11 @@ import { compare, hash } from 'bcrypt';
 import { sanitizeUser } from '../user/user.mapper';
 import { Role } from '@prisma/client';
 import { RefreshTokenBlacklistService } from './refresh-token-blacklist.service';
+import {
+  ForbiddenError,
+  UnauthorizedError,
+  ValidationError,
+} from '../common/errors';
 
 type VerifiedRefreshPayload = TokenPayload & { exp: number };
 
@@ -31,7 +31,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Login already taken');
+      throw new ValidationError('Login already taken');
     }
 
     const createdUser = await this.db.user.create({
@@ -51,12 +51,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ForbiddenException('Invalid login or password');
+      throw new ForbiddenError('Invalid login or password');
     }
 
     const passwordMatches = await compare(dto.password, user.password);
     if (!passwordMatches) {
-      throw new ForbiddenException('Invalid login or password');
+      throw new ForbiddenError('Invalid login or password');
     }
 
     return this.issueTokens({
@@ -70,7 +70,7 @@ export class AuthService {
     const { refreshToken, payload } = await this.verifyRefreshToken(dto);
 
     if (this.refreshTokenBlacklist.has(refreshToken)) {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new ForbiddenError('Invalid or expired refresh token');
     }
 
     const user = await this.db.user.findUnique({
@@ -78,7 +78,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new ForbiddenError('Invalid or expired refresh token');
     }
 
     return this.issueTokens({
@@ -96,7 +96,7 @@ export class AuthService {
         secret: process.env.JWT_SECRET,
       });
     } catch {
-      throw new UnauthorizedException('Invalid or expired access token');
+      throw new UnauthorizedError('Invalid or expired access token');
     }
 
     const user = await this.db.user.findUnique({
@@ -104,7 +104,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid or expired access token');
+      throw new UnauthorizedError('Invalid or expired access token');
     }
 
     return {
@@ -118,7 +118,7 @@ export class AuthService {
     const { refreshToken, payload } = await this.verifyRefreshToken(dto);
 
     if (this.refreshTokenBlacklist.has(refreshToken)) {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new ForbiddenError('Invalid or expired refresh token');
     }
 
     this.refreshTokenBlacklist.blacklist(refreshToken, payload.exp * 1000);
@@ -153,7 +153,7 @@ export class AuthService {
 
   private async verifyRefreshToken(dto: RefreshTokenDto) {
     if (!dto.refreshToken) {
-      throw new UnauthorizedException('Refresh token is required');
+      throw new UnauthorizedError('Refresh token is required');
     }
 
     let payload: VerifiedRefreshPayload;
@@ -166,11 +166,11 @@ export class AuthService {
         },
       );
     } catch {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new ForbiddenError('Invalid or expired refresh token');
     }
 
     if (typeof payload.exp !== 'number') {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new ForbiddenError('Invalid or expired refresh token');
     }
 
     return {

@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { DbService } from '../db/db.service';
@@ -13,6 +8,11 @@ import { applyPaginationAndSorting, PaginationQuery } from '../utils';
 import { Category } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { hasAdminPrivileges } from '../auth/bootstrap-admin';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors';
 
 @Injectable()
 export class CategoryService {
@@ -25,11 +25,11 @@ export class CategoryService {
 
   async getById(id: string) {
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
     const category = await this.db.category.findUnique({ where: { id } });
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundError('Category not found');
     }
     return category as unknown as Category;
   }
@@ -38,7 +38,7 @@ export class CategoryService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin) {
-      throw new ForbiddenException('Only admins can manage categories');
+      throw new ForbiddenError('Only admins can manage categories');
     }
 
     const newCategory = await this.db.category.create({
@@ -59,15 +59,15 @@ export class CategoryService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin) {
-      throw new ForbiddenException('Only admins can manage categories');
+      throw new ForbiddenError('Only admins can manage categories');
     }
 
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
     const category = await this.db.category.findUnique({ where: { id } });
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundError('Category not found');
     }
 
     const updated = await this.db.category.update({
@@ -82,15 +82,15 @@ export class CategoryService {
     const isAdmin = await hasAdminPrivileges(this.db, actor);
 
     if (!isAdmin) {
-      throw new ForbiddenException('Only admins can manage categories');
+      throw new ForbiddenError('Only admins can manage categories');
     }
 
     if (!isUuid(id)) {
-      throw new BadRequestException('Invalid UUID');
+      throw new ValidationError('Invalid UUID');
     }
     const category = await this.db.category.findUnique({ where: { id } });
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundError('Category not found');
     }
 
     await this.db.category.delete({ where: { id } });
