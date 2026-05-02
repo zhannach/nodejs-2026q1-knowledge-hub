@@ -1,4 +1,5 @@
-const SENSITIVE_KEY_PATTERN = /(password|token|authorization)/i;
+const SENSITIVE_KEY_PATTERN =
+  /(password|token|authorization|api[-_]?key|secret)/i;
 
 export function sanitizeForLogging(value: unknown): unknown {
   if (Array.isArray(value)) {
