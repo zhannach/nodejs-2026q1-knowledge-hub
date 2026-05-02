@@ -11,6 +11,7 @@ import { AppService } from './app.service';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppLogger } from './common/logging/app-logger.service';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     AuthModule,
     UserModule,
     ArticleModule,
+    AiModule,
     CategoryModule,
     CommentModule,
   ],
