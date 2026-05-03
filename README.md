@@ -20,7 +20,7 @@ npm install
 ## Gemini AI setup
 
 This project integrates Google Gemini through direct HTTP API calls and uses
-`gemini-2.0-flash` by default.
+`gemini-2.5-flash-lite` by default.
 
 ### Get a Gemini API key
 
@@ -37,14 +37,17 @@ Copy `.env.example` to `.env` and paste your key into `GEMINI_API_KEY`:
 ```
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_MIN_INTERVAL_MS=4500
 AI_RATE_LIMIT_RPM=20
 AI_CACHE_TTL_SEC=300
 ```
 
 `AI_RATE_LIMIT_RPM` controls the maximum number of AI requests per minute per
-client. `AI_CACHE_TTL_SEC` controls the in-memory cache lifetime for summarize
-and translate responses.
+client. `GEMINI_MIN_INTERVAL_MS` controls the minimum delay between upstream
+Gemini calls for the whole running app, which helps keep concurrent users under
+the project-level Gemini quota. `AI_CACHE_TTL_SEC` controls the in-memory cache
+lifetime for summarize and translate responses.
 
 ## Run application locally with Docker
 
