@@ -1,0 +1,32 @@
+export interface ArticleForRag {
+  id: string;
+  title: string;
+  content: string;
+  status: string;
+  categoryId: string | null;
+  tags: Array<{ name: string }>;
+}
+
+export interface RagChunk {
+  id: string;
+  articleId: string;
+  articleTitle: string;
+  articleStatus: string;
+  categoryId: string | null;
+  tags: string[];
+  chunk: string;
+  chunkIndex: number;
+}
+
+export interface VectorSearchFilters {
+  articleStatus?: 'draft' | 'published' | 'archived';
+  categoryId?: string;
+  tags?: string[];
+}
+
+export interface RagSearchResult {
+  articleId: string;
+  articleTitle: string;
+  chunk: string;
+  similarity: number;
+}
