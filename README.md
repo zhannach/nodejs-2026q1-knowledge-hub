@@ -19,8 +19,9 @@ npm install
 
 ## Gemini AI setup
 
-This project integrates Google Gemini through direct HTTP API calls and uses
-`gemini-2.5-flash-lite` by default.
+This project integrates Google Gemini through direct HTTP API calls. The AI
+features use `gemini-2.0-flash` for answer generation and
+`text-embedding-004` for embeddings.
 
 ### Get a Gemini API key
 
@@ -37,10 +38,17 @@ Copy `.env.example` to `.env` and paste your key into `GEMINI_API_KEY`:
 ```
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
-GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_EMBEDDING_MODEL=text-embedding-004
 GEMINI_MIN_INTERVAL_MS=4500
 AI_RATE_LIMIT_RPM=20
 AI_CACHE_TTL_SEC=300
+RAG_VECTOR_DB_PROVIDER=qdrant
+RAG_VECTOR_DB_URL=http://vectordb:6333
+RAG_VECTOR_COLLECTION=knowledge_hub_articles
+RAG_CHUNK_SIZE=800
+RAG_CHUNK_OVERLAP=200
+RAG_CONVERSATION_MAX_MESSAGES=20
 ```
 
 `AI_RATE_LIMIT_RPM` controls the maximum number of AI requests per minute per
@@ -48,6 +56,82 @@ client. `GEMINI_MIN_INTERVAL_MS` controls the minimum delay between upstream
 Gemini calls for the whole running app, which helps keep concurrent users under
 the project-level Gemini quota. `AI_CACHE_TTL_SEC` controls the in-memory cache
 lifetime for summarize and translate responses.
+
+## RAG setup
+
+Knowledge Hub RAG indexes published articles from PostgreSQL into Qdrant, an
+external vector database running in Docker Compose. Qdrant stores article chunk
+vectors with payload metadata for source attribution: article ID, title, status,
+category ID, tags, chunk text, and chunk index.
+
+### Full startup flow after clone
+
+1. Clone the repository and enter the project directory.
+2. Copy `.env.example` to `.env`.
+3. Create a Gemini API key in Google AI Studio:
+   - Open https://aistudio.google.com/.
+   - Sign in with a Google account.
+   - Click **Get API key**.
+   - Create a key in a new or existing Google Cloud project.
+   - Copy the key into `GEMINI_API_KEY` in `.env`.
+4. Start PostgreSQL, Qdrant, and the Nest application:
+
+```
+docker compose up --build
+```
+
+5. Create or seed articles and publish the articles you want RAG to use.
+6. Build the vector index:
+
+```
+curl -X POST http://localhost:4000/ai/rag/index \
+  -H "Content-Type: application/json" \
+  -d '{"onlyPublished":true}'
+```
+
+### Sample RAG requests
+
+Semantic search:
+
+```
+curl -X POST http://localhost:4000/ai/rag/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"How do I rotate refresh tokens?","limit":5,"articleStatus":"published"}'
+```
+
+Chat with grounded source attribution:
+
+```
+curl -X POST http://localhost:4000/ai/rag/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What does the knowledge hub say about article moderation?"}'
+```
+
+Selective reindex:
+
+```
+curl -X POST http://localhost:4000/ai/rag/index \
+  -H "Content-Type: application/json" \
+  -d '{"articleIds":["<articleId>"],"onlyPublished":false}'
+```
+
+Delete an article from the vector index:
+
+```
+curl -X DELETE http://localhost:4000/ai/rag/index/articles/<articleId>
+```
+
+Inspect optional conversation memory:
+
+```
+curl http://localhost:4000/ai/rag/chat/<conversationId>/history
+```
+
+Known RAG limitations: Gemini free-tier quotas may slow or reject indexing,
+large article sets take time because each chunk needs an embedding request,
+generated answers have upstream latency, and Gemini API/model availability can
+vary by region and Google project. Conversation memory is stored in PostgreSQL,
+but the vector index must be rebuilt after clearing Qdrant data.
 
 ## Run application locally with Docker
 
