@@ -14,10 +14,18 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      - RAG_VECTOR_DB_PROVIDER=${RAG_VECTOR_DB_PROVIDER:-qdrant}
+      - RAG_VECTOR_DB_URL=${RAG_VECTOR_DB_URL:-http://vectordb:6333}
+      - RAG_VECTOR_COLLECTION=${RAG_VECTOR_COLLECTION:-knowledge_hub_articles}
+      - RAG_CHUNK_SIZE=${RAG_CHUNK_SIZE:-800}
+      - RAG_CHUNK_OVERLAP=${RAG_CHUNK_OVERLAP:-200}
+      - RAG_CONVERSATION_MAX_MESSAGES=${RAG_CONVERSATION_MAX_MESSAGES:-20}
     env_file:
       - .env
     depends_on:
       db:
+        condition: service_healthy
+      vectordb:
         condition: service_healthy
     networks:
       - custom_network
@@ -48,6 +56,22 @@ services:
       retries: 5
     restart: unless-stopped
 
+  vectordb:
+    image: qdrant/qdrant:v1.13.4
+    container_name: knowledge-hub-vectordb
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrantdata:/qdrant/storage
+    networks:
+      - custom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   adminer:
     image: adminer:latest
     container_name: knowledge-hub-adminer
@@ -66,3 +90,4 @@ networks:
 
 volumes:
   pgdata:
+  qdrantdata:
