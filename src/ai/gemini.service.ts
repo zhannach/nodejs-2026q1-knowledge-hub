@@ -17,6 +17,12 @@ interface GeminiResponse {
   };
 }
 
+interface GeminiEmbeddingResponse {
+  embedding?: {
+    values?: number[];
+  };
+}
+
 interface GeminiErrorResponse {
   error?: {
     code?: number;
@@ -70,16 +76,10 @@ export class GeminiService {
   constructor(private readonly logger: AppLogger) {}
 
   async generateText(prompt: string): Promise<GeminiGeneration> {
-    if (this.isMockEnabled()) {
-      return {
-        text: this.generateMockText(prompt),
-      };
-    }
-
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      throw new InternalServerErrorException('Gemini API is not configured');
+      throw new ServiceUnavailableException('Gemini API is not configured');
     }
 
     const url = this.buildUrl();
@@ -185,6 +185,116 @@ export class GeminiService {
     );
   }
 
+  async embedText(text: string): Promise<number[]> {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      throw new ServiceUnavailableException('Gemini API is not configured');
+    }
+
+    const url = this.buildEmbeddingUrl();
+    let attempt = 0;
+
+    while (attempt <= this.maxRetries) {
+      try {
+        await this.throttle();
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            model: `models/${this.getEmbeddingModel()}`,
+            content: {
+              parts: [{ text }],
+            },
+          }),
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+
+        if (response.status === HttpStatus.TOO_MANY_REQUESTS) {
+          const geminiError = await this.readGeminiError(response);
+
+          throw new ServiceUnavailableException(
+            this.buildRateLimitMessage(geminiError),
+          );
+        }
+
+        if (
+          response.status === HttpStatus.UNAUTHORIZED ||
+          response.status === HttpStatus.FORBIDDEN
+        ) {
+          throw new InternalServerErrorException(
+            'Gemini authentication failed. Check server configuration.',
+          );
+        }
+
+        if (!response.ok) {
+          const geminiError = await this.readGeminiError(response);
+
+          this.logger.writeLog(
+            'error',
+            'Gemini embedding request failed',
+            {
+              statusCode: response.status,
+              upstreamStatus: geminiError.status,
+              quotaId: geminiError.quotaId,
+              quotaMetric: geminiError.quotaMetric,
+              model: geminiError.model,
+            },
+            'Gemini',
+          );
+
+          throw new ServiceUnavailableException(
+            'Gemini service is temporarily unavailable',
+          );
+        }
+
+        const payload = (await response.json()) as GeminiEmbeddingResponse;
+        const embedding = payload.embedding?.values;
+
+        if (!embedding?.length) {
+          throw new ServiceUnavailableException(
+            'Gemini returned an empty embedding',
+          );
+        }
+
+        return embedding;
+      } catch (error) {
+        if (
+          error instanceof InternalServerErrorException ||
+          error instanceof ServiceUnavailableException
+        ) {
+          throw error;
+        }
+
+        if (attempt < this.maxRetries && this.isRetryableError(error)) {
+          await this.backoff(attempt);
+          attempt++;
+          continue;
+        }
+
+        this.logger.writeLog(
+          'error',
+          'Gemini embedding request failed',
+          { error: error instanceof Error ? error.name : String(error) },
+          'Gemini',
+          error instanceof Error ? error.stack : undefined,
+        );
+
+        throw new ServiceUnavailableException(
+          'Gemini service is temporarily unavailable',
+        );
+      }
+    }
+
+    throw new ServiceUnavailableException(
+      'Gemini service is temporarily unavailable',
+    );
+  }
+
   private async throttle() {
     const previous = this.requestQueue;
     let releaseQueue: () => void;
@@ -214,16 +324,19 @@ export class GeminiService {
     const baseUrl =
       process.env.GEMINI_API_BASE_URL ??
       'https://generativelanguage.googleapis.com';
-    const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash-lite';
+    const model = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
     return `${baseUrl.replace(/\/$/, '')}/v1beta/models/${model}:generateContent`;
   }
 
-  private isMockEnabled() {
-    return process.env.AI_MOCK_GEMINI === 'true';
+  private buildEmbeddingUrl() {
+    const baseUrl =
+      process.env.GEMINI_API_BASE_URL ??
+      'https://generativelanguage.googleapis.com';
+    return `${baseUrl.replace(/\/$/, '')}/v1beta/models/${this.getEmbeddingModel()}:embedContent`;
   }
 
-  private generateMockText(prompt: string) {
-    return `Mock Gemini response: ${prompt.slice(0, 240)}`;
+  private getEmbeddingModel() {
+    return process.env.GEMINI_EMBEDDING_MODEL ?? 'text-embedding-004';
   }
 
   private extractText(payload: GeminiResponse) {
