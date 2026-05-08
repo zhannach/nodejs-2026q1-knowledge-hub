@@ -7,9 +7,10 @@ import { AiRateLimitGuard } from './ai-rate-limit.guard';
 import { AiService } from './ai.service';
 import { AiUsageService } from './ai-usage.service';
 import { GeminiService } from './gemini.service';
+import { RagModule } from './rag/rag.module';
 
 @Module({
-  imports: [ArticleModule],
+  imports: [ArticleModule, RagModule],
   controllers: [AiController],
   providers: [
     AiService,
