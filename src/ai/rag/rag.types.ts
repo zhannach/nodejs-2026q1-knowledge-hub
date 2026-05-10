@@ -5,6 +5,7 @@ export interface ArticleForRag {
   status: string;
   categoryId: string | null;
   tags: Array<{ name: string }>;
+  updatedAt: Date;
 }
 
 export interface RagChunk {
@@ -29,4 +30,10 @@ export interface RagSearchResult {
   articleTitle: string;
   chunk: string;
   similarity: number;
+  chunkIndex: number;
+  retrievalMethods: Array<'semantic' | 'lexical'>;
+  rankingScore: number;
+  semanticScore?: number;
+  lexicalScore?: number;
+  rerankScore?: number;
 }

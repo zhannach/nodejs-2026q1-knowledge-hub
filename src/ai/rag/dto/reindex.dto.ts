@@ -5,6 +5,10 @@ export class ReindexDto {
   @IsOptional()
   onlyPublished?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  incremental?: boolean;
+
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

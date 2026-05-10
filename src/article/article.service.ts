@@ -13,10 +13,14 @@ import {
   NotFoundError,
   ValidationError,
 } from '../common/errors';
+import { RagIndexSyncService } from '../ai/rag/rag-index-sync.service';
 
 @Injectable()
 export class ArticleService {
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    private readonly ragIndexSync: RagIndexSyncService,
+  ) {}
 
   private readonly allowedStatusTransitions: Record<
     ArticleStatus,
@@ -120,6 +124,8 @@ export class ArticleService {
       },
     });
 
+    await this.ragIndexSync.syncArticle(article.id);
+
     return this.serializeArticle(article);
   }
 
@@ -199,6 +205,8 @@ export class ArticleService {
       },
     });
 
+    await this.ragIndexSync.syncArticle(updated.id);
+
     return this.serializeArticle(updated);
   }
 
@@ -224,6 +232,7 @@ export class ArticleService {
     await this.db.article.delete({
       where: { id },
     });
+    await this.ragIndexSync.deleteArticle(id);
 
     return { message: 'Article deleted successfully' };
   }

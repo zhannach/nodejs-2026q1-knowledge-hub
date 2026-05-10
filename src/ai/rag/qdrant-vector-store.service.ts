@@ -20,6 +20,7 @@ interface QdrantSearchPoint {
     articleId?: string;
     articleTitle?: string;
     chunk?: string;
+    chunkIndex?: number;
   };
 }
 
@@ -111,6 +112,13 @@ export class QdrantVectorStoreService {
         articleTitle: point.payload!.articleTitle ?? '',
         chunk: point.payload!.chunk!,
         similarity: point.score ?? 0,
+        chunkIndex:
+          typeof point.payload!.chunkIndex === 'number'
+            ? point.payload!.chunkIndex
+            : 0,
+        retrievalMethods: ['semantic'],
+        rankingScore: point.score ?? 0,
+        semanticScore: point.score ?? 0,
       }));
   }
 
