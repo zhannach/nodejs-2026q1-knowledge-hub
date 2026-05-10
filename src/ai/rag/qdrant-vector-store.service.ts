@@ -1,4 +1,9 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { AppLogger } from '../../common/logging/app-logger.service';
 import { getRagConfig } from './rag-config';
 import { RagChunk, RagSearchResult, VectorSearchFilters } from './rag.types';
@@ -27,6 +32,14 @@ export class QdrantVectorStoreService {
   }
 
   async recreateCollection(vectorSize: number) {
+    const exists = await this.collectionExists();
+
+    if (exists) {
+      await this.request(`/collections/${this.collectionName}`, {
+        method: 'DELETE',
+      });
+    }
+
     await this.request(`/collections/${this.collectionName}`, {
       method: 'PUT',
       body: {
@@ -159,12 +172,14 @@ export class QdrantVectorStoreService {
       await this.request(`/collections/${this.collectionName}`, {
         method: 'GET',
       });
+
       return true;
     } catch (error) {
-      if (
-        error instanceof ServiceUnavailableException ||
-        !(error instanceof Error)
-      ) {
+      if (error instanceof NotFoundException) {
+        return false;
+      }
+
+      if (error instanceof ServiceUnavailableException) {
         throw error;
       }
 
@@ -216,15 +231,22 @@ export class QdrantVectorStoreService {
         signal: AbortSignal.timeout(10000),
       });
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Qdrant resource not found');
-        }
+      if (response.status === 404) {
+        throw new NotFoundException('Qdrant resource not found');
+      }
 
+      if (response.status === 409) {
+        throw new ConflictException('Qdrant collection already exists');
+      }
+
+      if (!response.ok) {
         this.logger.writeLog(
           'error',
           'Vector database request failed',
-          { statusCode: response.status, provider: config.vectorDbProvider },
+          {
+            statusCode: response.status,
+            provider: config.vectorDbProvider,
+          },
           'RAG',
         );
 
@@ -241,8 +263,8 @@ export class QdrantVectorStoreService {
     } catch (error) {
       if (
         error instanceof ServiceUnavailableException ||
-        (error instanceof Error &&
-          error.message === 'Qdrant resource not found')
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
       ) {
         throw error;
       }
@@ -250,7 +272,9 @@ export class QdrantVectorStoreService {
       this.logger.writeLog(
         'error',
         'Vector database connection failed',
-        { error: error instanceof Error ? error.name : String(error) },
+        {
+          error: error instanceof Error ? error.name : String(error),
+        },
         'RAG',
         error instanceof Error ? error.stack : undefined,
       );

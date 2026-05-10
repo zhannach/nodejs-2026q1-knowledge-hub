@@ -5,7 +5,7 @@ WORKDIR /app
 # Install dependencies
 RUN apk add --no-cache python3 make g++
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy source and build
 COPY . .
@@ -23,7 +23,7 @@ ENV PORT=4000
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copy built output
 COPY --from=build /app/dist ./dist
