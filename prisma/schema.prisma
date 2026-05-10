@@ -81,3 +81,24 @@ model Tag {
 
   @@index([name])
 }
+
+model RagConversationMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String
+  content        String
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model RagArticleIndexState {
+  articleId         String   @id
+  contentHash       String
+  articleStatus     String
+  articleUpdatedAt  DateTime
+  indexedAt         DateTime @default(now())
+
+  @@index([articleStatus])
+  @@index([indexedAt])
+}
